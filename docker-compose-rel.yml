@@ -1,8 +1,13 @@
 version: "3.9"
 services:
   aprsc:
-    image: peterus/aprsc:latest
-    restart: always
+    image: hemna6969/trackdirect-aprsc:latest
+    container_name: trackdirect-aprsc
+    restart: unless-stopped
+    mac_address: 02:42:C0:A8:99:01
+    networks:
+      external:
+        ipv4_address: 192.168.0.101
     ports:
       - "10152:10152"
       - "14580:14580"
@@ -12,8 +17,13 @@ services:
       - $PWD/config/aprsc.conf:/opt/aprsc/etc/aprsc.conf
 
   collector:
-    image: peterus/trackdirect-python:latest
-    restart: always
+    image: hemna6969/trackdirect-python:latest
+    container_name: trackdirect-collector
+    restart: unless-stopped
+    mac_address: 02:42:C0:A8:99:02
+    networks:
+      external:
+        ipv4_address: 192.168.0.102
     volumes:
       - $PWD/config/trackdirect.ini:/root/trackdirect/config/trackdirect.ini
     command: /root/trackdirect/server/scripts/collector.sh trackdirect.ini 0
@@ -21,35 +31,70 @@ services:
       - "db"
       - "aprsc"
 
+  cron:
+    image: hemna6969/trackdirect-cron:latest
+    container_name: trackdirect-cron
+    restart: unless-stopped
+    volumes:
+      - $PWD/config/trackdirect.ini:/root/trackdirect/config/trackdirect.ini
+    depends_on:
+      - "collector"
+      - "db"
+
   websocket:
-    image: peterus/trackdirect-python:latest
-    restart: always
+    image: hemna6969/trackdirect-python:latest
+    container_name: trackdirect-websocket
+    restart: unless-stopped
     volumes:
       - $PWD/config/trackdirect.ini:/root/trackdirect/config/trackdirect.ini
     command: /root/trackdirect/server/scripts/wsserver.sh trackdirect.ini
     ports:
-      - "9000:9000"
+      - "9001:9001"
     depends_on:
       - "db"
       - "aprsc"
 
   web:
-    image: peterus/trackdirect-apache:latest
-    restart: always
+    image: hemna6969/trackdirect-web:latest
+    container_name: trackdirect-web
+    restart: unless-stopped
     volumes:
       - $PWD/config/trackdirect.ini:/root/trackdirect/config/trackdirect.ini
       - $PWD/heatmaps:/root/trackdirect/htdocs/public/heatmaps
     ports:
-      - "80:80"
+      - "8500:80"
     depends_on:
       - "db"
 
+  db_adminer:
+    image: adminer
+    container_name: trackdirect-adminer
+    restart: unless-stopped
+    depends_on:
+        - "db"
+    ports:
+      - 8066:8080
+
   db:
-    image: peterus/trackdirect-db:latest
+    image: hemna6969/trackdirect-db:latest
+    container_name: trackdirect-db
     restart: always
+    mac_address: 02:42:C0:A8:99:05
+    networks:
+      external:
+        ipv4_address: 192.168.0.105
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: foobar
       POSTGRES_DB: trackdirect
     volumes:
       - $PWD/db:/var/lib/postgresql/data
+
+
+#networks:
+#default:
+#    name: external
+#    external: true
+networks:
+  external:
+    external: true
